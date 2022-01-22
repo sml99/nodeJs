@@ -10,20 +10,18 @@ const tempCard = fs.readFileSync(`${__dirname}/templates/card.html`, 'utf-8');
 const tempProduct = fs.readFileSync(`${__dirname}/templates/product.html`, 'utf-8');
 
 const dataObject = JSON.parse(data);
-const slugs = dataObject.map(el => slugify(el.productName, { lower: true }))
-
+if (!dataObject[0]?.slug) {
+    const slugs = dataObject.map(el => slugify(el.productName, { lower: true }));
+    dataObject.map((el, index) => el.slug = slugs[index]);
+    fs.writeFileSync(`${__dirname}/dev-data/data.json`, JSON.stringify(dataObject));
+}
 
 const server = http.createServer((req, res) => {
     const reqUrl = new URL(req.url, req.protocol + '://' + req.headers.host + '/');
     const pathName = reqUrl.pathname;
-    ///////////////////////////////////////////////
-    const query = reqUrl.search.match(/([0-9A-Za-z]+)/mg);
-    const queryObj = {};
-    if (query?.length > 0)
-        for (i = 0; i < query.length; i += 2)
-            queryObj[query[i]] = query[i + 1];
-    //////////////////////////////////////////////
-    switch (pathName) {
+    paths = pathName.match(/\/?[A-Za-z\-]+/g) ?? ['/'];
+
+    switch (paths[0]) {
         case '/overview':
         case '/':
             const cardsHtml = dataObject.map(el => replaceTemplate(tempCard, el)).join('');
@@ -33,8 +31,8 @@ const server = http.createServer((req, res) => {
             res.end(overViewOutput);
             break;
         case '/product':
-            if (query?.includes('id') && ('id' in queryObj) && dataObject[queryObj.id]) {
-                const product = dataObject[queryObj.id];
+            const product = dataObject.find(el => '/' + el.slug == paths[1]);
+            if (product) {
                 const productOutput = replaceTemplate(tempProduct, product);
                 res.writeHead(200, { 'content-type': 'text/html' });
                 res.end(productOutput);
